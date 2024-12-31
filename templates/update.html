@@ -1,0 +1,50 @@
+{% extends "layout.html" %}
+
+{% block title %}Güncelleme Sayfası{% endblock title %}
+
+{% block content %}
+<h1>Veri Güncelle</h1>
+
+<form method="post" action="/update-row">
+    <input type="hidden" name="ip" value="{{ ip }}">
+    <input type="hidden" name="db_name" value="{{ db_name }}">
+    <input type="hidden" name="table_name" value="{{ table_name }}">
+
+    <!-- Sütun adları ve değerleriyle form alanlarını oluştur -->
+    {% for column, value in zip(columns, row_data) %}
+    <div>
+        <label for="{{ column }}">{{ column }}</label>
+        <input 
+            type="text" 
+            id="{{ column }}" 
+            name="row_data[]" 
+            value="{{ value }}" 
+            required>
+        <input type="hidden" name="columns[]" value="{{ column }}">
+    </div>
+    {% endfor %}
+
+    <button type="submit">Güncelle</button>
+    <a href="/">İptal</a>
+</form>
+
+<!-- SweetAlert JS ve CSS bağlantılarını ekleyelim -->
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+<script>
+    {% if request.args.get('success') == 'true' %}
+        Swal.fire({
+            title: 'Başarılı!',
+            text: 'Veri başarıyla güncellendi!',
+            icon: 'success',
+            confirmButtonText: 'Tamam'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                // Yönlendirme
+                window.location.href = "{{ request.args.get('redirect') }}";
+            }
+        });
+    {% endif %}
+</script>
+
+{% endblock content %}

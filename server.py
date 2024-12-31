@@ -119,5 +119,62 @@ def index():
 
     return render_template("home_page.html", devices=devices, fetched_data=fetched_data, databases=databases, tables=tables, selected_ip=selected_ip, selected_db=selected_db, selected_table=selected_table)
 
+@app.route("/update-row", methods=["GET", "POST"])
+def update_row():
+    if request.method == "GET":
+        # URL'den parametreleri al
+        ip = request.args.get("ip")
+        db_name = request.args.get("db_name")
+        table_name = request.args.get("table_name")
+        row_data = request.args.get("row_data", "").split("|")
+        columns = request.args.get("columns", "").split("|")
+
+        # Güncelleme formunu render et
+        return render_template(
+            "update.html",
+            ip=ip,
+            db_name=db_name,
+            table_name=table_name,
+            row_data=row_data,
+            columns=columns
+        )
+    
+    if request.method == "POST":
+        # POST isteği ile gelen veriyi işle
+        ip = request.form.get("ip")
+        db_name = request.form.get("db_name")
+        table_name = request.form.get("table_name")
+        row_data = request.form.getlist("row_data[]")
+        columns = request.form.getlist("columns[]")
+
+        # Güncelleme işlemleri ve yanıt döndürme işlemleri
+        try:
+            set_clause = ", ".join([f"{col}='{val}'" for col, val in zip(columns, row_data)])
+            primary_key = columns[0]  # İlk sütunun primary key olduğunu varsayıyoruz
+            primary_value = row_data[0]
+
+            command = (
+                f"mysql -u root -p{SSH_PASSWORD} -D {db_name} -e "
+                f"\"UPDATE {table_name} SET {set_clause} WHERE {primary_key}='{primary_value}';\""
+            )
+
+            ssh = paramiko.SSHClient()
+            ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            ssh.connect(hostname=ip, username=SSH_USER, password=SSH_PASSWORD)
+
+            stdin, stdout, stderr = ssh.exec_command(command)
+            ssh.close()
+
+            # Başarıyla tamamlandı, JSON yanıtı dön
+            return render_template("home_page.html")
+        except Exception as e:
+            # Hata durumunda mesaj döndür
+            return {"success": False, "message": str(e)}, 500
+
+@app.context_processor
+def utility_processor():
+    return dict(zip=zip)
+
 if __name__ == "__main__":
     app.run(debug=True, port=8080)
+

@@ -39,25 +39,53 @@
     </form>
 
     {% if fetched_data %}
-    <h2>Tablodan Gelen Veriler</h2>
-    <table>
-        <thead>
-            <tr>
-                {% for column in fetched_data[0] %}
-                    <th>{{ column }}</th>
-                {% endfor %}
-            </tr>
-        </thead>
-        <tbody>
-            {% for row in fetched_data[1:] %}
-                <tr>
-                    {% for cell in row %}
-                        <td>{{ cell }}</td>
-                    {% endfor %}
-                </tr>
+<h2>Tablodan Gelen Veriler</h2>
+<table>
+    <thead>
+        <tr>
+            {% for column in fetched_data[0] %}
+                <th>{{ column }}</th>
             {% endfor %}
-        </tbody>
-    </table>
-    {% endif %}
+            <th>Güncelle</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for row in fetched_data[1:] %}
+            <tr>
+                {% for cell in row %}
+                    <td>{{ cell }}</td>
+                {% endfor %}
+                <td>
+                    <a 
+                        class="update-btn" 
+                        href="{{ url_for('update_row', 
+                            ip=selected_ip, 
+                            db_name=selected_db, 
+                            table_name=selected_table, 
+                            row_data=row|join('|'), 
+                            columns=fetched_data[0]|join('|')
+                        ) }}">
+                        Güncelle
+                    </a>
+                </td>
+                
+                
+            </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endif %}
+
+<!-- Güncelle Modal -->
+<div id="update-modal" style="display:none;">
+    <form id="update-form" method="post" action="/update-row">
+        <input type="hidden" name="ip" value="{{ selected_ip }}">
+        <input type="hidden" name="db_name" value="{{ selected_db }}">
+        <input type="hidden" name="table_name" value="{{ selected_table }}">
+        <div id="update-fields"></div>
+        <button type="submit">Kaydet</button>
+        <button type="button" onclick="closeUpdateModal()">İptal</button>
+    </form>
+</div>
 
 {% endblock content %}
