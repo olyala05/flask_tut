@@ -80,6 +80,17 @@
 </form>
 {% endif %}
 
+{% if modem_files %}
+    <h3>Modem Dosyaları:</h3>
+    <ul>
+        {% for file in modem_files %}
+            <li>{{ file }}</li>
+        {% endfor %}
+    </ul>
+{% else %}
+    <p>Modem dosyaları alınamadı.</p>
+{% endif %}
+
 <script>
     function toggleSelectAll() {
         var selectAll = document.getElementById("select-all");
@@ -108,4 +119,5 @@
         }
     }
 </script>
+
 {% endblock content %} 

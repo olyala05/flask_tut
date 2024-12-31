@@ -2,6 +2,8 @@ from flask import Flask, render_template, request, redirect, url_for
 import os
 import paramiko
 import pymysql.cursors
+import logging
+logging.basicConfig(level=logging.DEBUG)
 
 app = Flask(__name__)
 
@@ -95,6 +97,28 @@ def fetch_data_from_table(ip, db_name, table_name):
     except Exception as e:
         return [[f"Hata: {str(e)}"]]
 
+def modem_files(ip):
+    try:
+        ssh = paramiko.SSHClient()
+        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        ssh.connect(hostname=ip, username=SSH_USER, password=SSH_PASSWORD)
+
+        command = "ls /etc/"
+        stdin, stdout, stderr = ssh.exec_command(command)
+
+        output = stdout.read().decode("utf-8")
+        error_output = stderr.read().decode("utf-8")
+        ssh.close()
+
+        if error_output:
+            print(f"Hata: {error_output}")
+            raise Exception(f"Komut hatası: {error_output}")
+
+        files = output.splitlines()
+        return files
+    except Exception as e:
+        print(f"Hata: {str(e)}")
+        return [[f"Hata: {str(e)}"]]
 
 @app.route("/", methods=["GET", "POST"])
 def index():
@@ -102,6 +126,7 @@ def index():
     fetched_data = None
     databases = None
     tables = None
+    modem_files = None
 
     selected_ip = request.form.get("selected_ip")
     selected_db = request.form.get("selected_db")
@@ -117,7 +142,17 @@ def index():
         # Seçilen tabloyu getir
         fetched_data = fetch_data_from_table(selected_ip, selected_db, selected_table)
 
-    return render_template("home_page.html", devices=devices, fetched_data=fetched_data, databases=databases, tables=tables, selected_ip=selected_ip, selected_db=selected_db, selected_table=selected_table)
+    return render_template(
+        "home_page.html", 
+        devices=devices, 
+        fetched_data=fetched_data, 
+        databases=databases, 
+        tables=tables, 
+        selected_ip=selected_ip, 
+        selected_db=selected_db, 
+        selected_table=selected_table,
+        modem_files=modem_files
+    )
 
 @app.route("/update-row", methods=["GET", "POST"])
 def update_row():
@@ -169,7 +204,6 @@ def update_row():
         except Exception as e:
             return {"success": False, "message": str(e)}, 500
         
-
 @app.route("/delete-selected-rows", methods=["POST"])
 def delete_selected_rows():
     try:
@@ -201,7 +235,7 @@ def delete_selected_rows():
         return redirect(url_for("index"))
     except Exception as e:
         return {"success": False, "message": str(e)}, 500
-
+    
 @app.context_processor
 def utility_processor():
     return dict(zip=zip)
