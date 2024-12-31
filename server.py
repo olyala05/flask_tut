@@ -117,7 +117,7 @@ def index():
         # Seçilen tabloyu getir
         fetched_data = fetch_data_from_table(selected_ip, selected_db, selected_table)
 
-    return render_template("layout.html", devices=devices, fetched_data=fetched_data, databases=databases, tables=tables, selected_ip=selected_ip, selected_db=selected_db, selected_table=selected_table)
+    return render_template("home_page.html", devices=devices, fetched_data=fetched_data, databases=databases, tables=tables, selected_ip=selected_ip, selected_db=selected_db, selected_table=selected_table)
 
 if __name__ == "__main__":
     app.run(debug=True, port=8080)

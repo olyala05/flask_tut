@@ -1,2 +1,63 @@
 {# extend et layout sayfasını #}
 {% extends "layout.html" %}
+
+{% block title %}Ethernet'e Bağlı Cihazlar{% endblock title %}
+
+{% block content %}
+<h1>Ethernet'e Bağlı Cihazlar</h1>
+
+    <form method="post" id="device-form">
+        <label for="selected_ip">Cihaz Seç:</label>
+        <select id="selected_ip" name="selected_ip" onchange="resetSelections()">
+            <option value="">Seçiniz...</option>
+            {% for device in devices %}
+                <option value="{{ device }}" {% if device == selected_ip %}selected{% endif %}>{{ device }}</option>
+            {% endfor %}
+        </select>
+
+        {% if selected_ip %}
+            <label for="selected_db">Veritabanı Seç:</label>
+            <select id="selected_db" name="selected_db">
+                <option value="">Seçiniz...</option>
+                {% for db in databases %}
+                    <option value="{{ db }}" {% if db == selected_db %}selected{% endif %}>{{ db }}</option>
+                {% endfor %}
+            </select>
+        {% endif %}
+
+        {% if selected_db %}
+            <label for="selected_table">Tablo Seç:</label>
+            <select id="selected_table" name="selected_table">
+                <option value="">Seçiniz...</option>
+                {% for table in tables %}
+                    <option value="{{ table }}" {% if table == selected_table %}selected{% endif %}>{{ table }}</option>
+                {% endfor %}
+            </select>
+        {% endif %}
+
+        <button type="submit">Verileri Göster</button>
+    </form>
+
+    {% if fetched_data %}
+    <h2>Tablodan Gelen Veriler</h2>
+    <table>
+        <thead>
+            <tr>
+                {% for column in fetched_data[0] %}
+                    <th>{{ column }}</th>
+                {% endfor %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in fetched_data[1:] %}
+                <tr>
+                    {% for cell in row %}
+                        <td>{{ cell }}</td>
+                    {% endfor %}
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% endif %}
+
+{% endblock content %}
