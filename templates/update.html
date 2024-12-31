@@ -9,8 +9,7 @@
     <input type="hidden" name="ip" value="{{ ip }}">
     <input type="hidden" name="db_name" value="{{ db_name }}">
     <input type="hidden" name="table_name" value="{{ table_name }}">
-
-    <!-- Sütun adları ve değerleriyle form alanlarını oluştur -->
+    
     {% for column, value in zip(columns, row_data) %}
     <div>
         <label for="{{ column }}">{{ column }}</label>
@@ -23,10 +22,11 @@
         <input type="hidden" name="columns[]" value="{{ column }}">
     </div>
     {% endfor %}
-
+    <br>
     <button type="submit">Güncelle</button>
-    <a href="/">İptal</a>
+    <a href="/"><button type="button" class="btn btn-danger">İptal</button></a>
 </form>
+
 
 <!-- SweetAlert JS ve CSS bağlantılarını ekleyelim -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
@@ -40,8 +40,7 @@
             confirmButtonText: 'Tamam'
         }).then((result) => {
             if (result.isConfirmed) {
-                // Yönlendirme
-                window.location.href = "{{ request.args.get('redirect') }}";
+                window.location.href = "{{ redirect }}";
             }
         });
     {% endif %}

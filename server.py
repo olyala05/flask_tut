@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request 
+from flask import Flask, render_template, request
 import os
 import paramiko
 import pymysql.cursors
@@ -128,7 +128,7 @@ def update_row():
         table_name = request.args.get("table_name")
         row_data = request.args.get("row_data", "").split("|")
         columns = request.args.get("columns", "").split("|")
-
+    
         # Güncelleme formunu render et
         return render_template(
             "update.html",
