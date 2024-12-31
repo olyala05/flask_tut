@@ -1,4 +1,3 @@
-{# extend et layout sayfasını #}
 {% extends "layout.html" %}
 
 {% block title %}Ethernet'e Bağlı Cihazlar{% endblock title %}
@@ -6,71 +5,107 @@
 {% block content %}
 <h1>Ethernet'e Bağlı Cihazlar</h1>
 
-    <form method="post" id="device-form">
-        <label for="selected_ip">Cihaz Seç:</label>
-        <select id="selected_ip" name="selected_ip" onchange="resetSelections()">
+<form method="post" id="device-form">
+    <label for="selected_ip">Cihaz Seç:</label>
+    <select id="selected_ip" name="selected_ip" onchange="resetSelections()">
+        <option value="">Seçiniz...</option>
+        {% for device in devices %}
+            <option value="{{ device }}" {% if device == selected_ip %}selected{% endif %}>{{ device }}</option>
+        {% endfor %}
+    </select>
+
+    {% if selected_ip %}
+        <label for="selected_db">Veritabanı Seç:</label>
+        <select id="selected_db" name="selected_db">
             <option value="">Seçiniz...</option>
-            {% for device in devices %}
-                <option value="{{ device }}" {% if device == selected_ip %}selected{% endif %}>{{ device }}</option>
+            {% for db in databases %}
+                <option value="{{ db }}" {% if db == selected_db %}selected{% endif %}>{{ db }}</option>
             {% endfor %}
         </select>
+    {% endif %}
 
-        {% if selected_ip %}
-            <label for="selected_db">Veritabanı Seç:</label>
-            <select id="selected_db" name="selected_db">
-                <option value="">Seçiniz...</option>
-                {% for db in databases %}
-                    <option value="{{ db }}" {% if db == selected_db %}selected{% endif %}>{{ db }}</option>
-                {% endfor %}
-            </select>
-        {% endif %}
-
-        {% if selected_db %}
-            <label for="selected_table">Tablo Seç:</label>
-            <select id="selected_table" name="selected_table">
-                <option value="">Seçiniz...</option>
-                {% for table in tables %}
-                    <option value="{{ table }}" {% if table == selected_table %}selected{% endif %}>{{ table }}</option>
-                {% endfor %}
-            </select>
-        {% endif %}
-
-        <button type="submit">Verileri Göster</button>
-    </form>
-
-    {% if fetched_data %}
-<h2>Tablodan Gelen Veriler</h2>
-<table>
-    <thead>
-        <tr>
-            {% for column in fetched_data[0] %}
-                <th>{{ column }}</th>
+    {% if selected_db %}
+        <label for="selected_table">Tablo Seç:</label>
+        <select id="selected_table" name="selected_table">
+            <option value="">Seçiniz...</option>
+            {% for table in tables %}
+                <option value="{{ table }}" {% if table == selected_table %}selected{% endif %}>{{ table }}</option>
             {% endfor %}
-            <th>Güncelle</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for row in fetched_data[1:] %}
+        </select>
+    {% endif %}
+
+    <button type="submit">Verileri Göster</button>
+</form>
+
+{% if fetched_data %}
+<h2>Tablodan Gelen Veriler</h2>
+<form method="POST" action="{{ url_for('delete_selected_rows', ip=selected_ip, db_name=selected_db, table_name=selected_table) }}">
+    <table>
+        <thead>
             <tr>
-                {% for cell in row %}
-                    <td>{{ cell }}</td>
+                <th><input type="checkbox" id="select-all" onclick="toggleSelectAll()"></th>
+                {% for column in fetched_data[0] %}
+                    <th>{{ column }}</th>
                 {% endfor %}
-                <td>
-                    <a 
-                        class="update-btn" 
-                        href="{{ url_for('update_row', 
+                <th>İşlem</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in fetched_data[1:] %}
+                <tr id="row-{{ row[0] }}">
+                    <td><input type="checkbox" name="selected_rows" value="{{ row[0] }}"></td>
+                    {% for cell in row %}
+                        <td>{{ cell }}</td>
+                    {% endfor %}
+                    <td>
+                        <!-- Güncelleme ve Silme Butonları -->
+                        <a class="update-btn" href="{{ url_for('update_row', 
                             ip=selected_ip, 
                             db_name=selected_db, 
                             table_name=selected_table, 
                             row_data=row|join('|'), 
                             columns=fetched_data[0]|join('|')
                         ) }}">
-                         <button>Güncelle</button>   
-                    </a>
-                </td> 
-            </tr>
-        {% endfor %}
-    </tbody>
-</table>
+                            <button type="button">Güncelle</button>   
+                        </a>
+                        <!-- Satır Silme Butonu -->
+                        <button type="button" class="btn btn-danger" onclick="deleteRow({{ row[0] }})">Sil</button>
+                    </td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <br>
+    <button type="submit" id="delete-btn" class="btn btn-danger">Seçilenleri Sil</button>
+</form>
 {% endif %}
-{% endblock content %}
+
+<script>
+    function toggleSelectAll() {
+        var selectAll = document.getElementById("select-all");
+        var checkboxes = document.getElementsByName("selected_rows");
+        for (var i = 0; i < checkboxes.length; i++) {
+            checkboxes[i].checked = selectAll.checked;
+        }
+    }
+
+    function deleteRow(rowId) {
+        // Burada AJAX veya başka bir yöntem ile yalnızca seçilen satırı silmeye yönelik bir işlem
+        if (confirm("Bu satırı silmek istediğinizden emin misiniz?")) {
+            var row = document.getElementById("row-" + rowId);
+            row.parentNode.removeChild(row);
+            fetch(`/delete_row/${rowId}`, {
+                method: 'DELETE',
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert("Satır başarıyla silindi.");
+                } else {
+                    alert("Silme işlemi başarısız oldu.");
+                }
+            });
+        }
+    }
+</script>
+{% endblock content %} 

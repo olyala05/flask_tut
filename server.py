@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request
+from flask import Flask, render_template, request, redirect, url_for
 import os
 import paramiko
 import pymysql.cursors
@@ -147,7 +147,6 @@ def update_row():
         row_data = request.form.getlist("row_data[]")
         columns = request.form.getlist("columns[]")
 
-        # Güncelleme işlemleri ve yanıt döndürme işlemleri
         try:
             set_clause = ", ".join([f"{col}='{val}'" for col, val in zip(columns, row_data)])
             primary_key = columns[0]  # İlk sütunun primary key olduğunu varsayıyoruz
@@ -165,11 +164,43 @@ def update_row():
             stdin, stdout, stderr = ssh.exec_command(command)
             ssh.close()
 
-            # Başarıyla tamamlandı, JSON yanıtı dön
-            return render_template("home_page.html")
+            # Başarıyla tamamlandıktan sonra yönlendirme
+            return redirect(url_for("index"))
         except Exception as e:
-            # Hata durumunda mesaj döndür
             return {"success": False, "message": str(e)}, 500
+        
+
+@app.route("/delete-selected-rows", methods=["POST"])
+def delete_selected_rows():
+    try:
+        # Formdan gelen veriyi al
+        selected_rows = request.form.getlist("selected_rows")
+        ip = request.args.get("ip")
+        db_name = request.args.get("db_name")
+        table_name = request.args.get("table_name")
+
+        # Eğer hiçbir satır seçilmemişse hata döndür
+        if not selected_rows:
+            return redirect(url_for("index"))
+
+        # Silme komutunu oluştur
+        for row_id in selected_rows:
+            command = (
+                f"mysql -u root -p{SSH_PASSWORD} -D {db_name} -e "
+                f"\"DELETE FROM {table_name} WHERE id='{row_id}';\""
+            )
+
+            ssh = paramiko.SSHClient()
+            ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            ssh.connect(hostname=ip, username=SSH_USER, password=SSH_PASSWORD)
+
+            # Silme komutunu çalıştır
+            ssh.exec_command(command)
+            ssh.close()
+
+        return redirect(url_for("index"))
+    except Exception as e:
+        return {"success": False, "message": str(e)}, 500
 
 @app.context_processor
 def utility_processor():
