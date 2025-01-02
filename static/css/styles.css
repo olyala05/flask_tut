@@ -76,3 +76,15 @@ tr:hover {
     }
 }
 
+/* Başlığın üzerine gelince cursor pointer olsun */
+.toggle-header {
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+/* İkonun animasyonu */
+#toggle-icon {
+    transition: transform 0.3s ease;
+}

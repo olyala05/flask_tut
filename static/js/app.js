@@ -42,3 +42,17 @@ function confirmRestart() {
         return false; 
     }
 }
+
+// Dosyaları getirip açıp kapar
+function toggleFiles() {
+    const fileList = document.getElementById('file-list');
+    const toggleIcon = document.getElementById('toggle-icon');
+
+    if (fileList.style.display === 'none' || fileList.style.display === '') {
+        fileList.style.display = 'block'; // Göster
+        toggleIcon.style.transform = 'rotate(0deg)'; 
+    } else {
+        fileList.style.display = 'none'; // Gizle
+        toggleIcon.style.transform = 'rotate(180deg)'; 
+    }
+}

@@ -36,67 +36,92 @@
     <br><br>
     <button type="submit" class="btn btn-success">Seçilen Ip'nin Verileri'ni Getir</button>
 
-    <button type="submit" name="fetch_equipment_data" class="btn btn-primary">Ekipman Verilerini Getir</button>
-
+    {# <button type="submit" name="fetch_equipment_data" class="btn btn-primary">Ekipman Verilerini Getir</button> #}
+    
+    <button type="submit" name="fetch_equipment_data" class="btn btn-primary">
+        Modemin Ekipmanlarını Getir
+    </button>
     <button type="submit" name="restart_modem" class="btn btn-danger" onclick="confirmRestart()">
         <i class="fa-solid fa-rotate-left"></i> Modemi Yeniden Başlat
     </button>
 
 </form>
 
+
 {% if fetched_data %}
-<h2>Tablodan Gelen Veriler</h2>
-<form method="POST" action="{{ url_for('delete_selected_rows', ip=selected_ip, db_name=selected_db, table_name=selected_table) }}">
-    <table>
-        <thead>
-            <tr>
-                <th><input type="checkbox" id="select-all" onclick="toggleSelectAll()"></th>
-                {% for column in fetched_data[0] %}
-                    <th>{{ column }}</th>
-                {% endfor %}
-                <th>İşlem</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for row in fetched_data[1:] %}
-                <tr id="row-{{ row[0] }}">
-                    <td><input type="checkbox" name="selected_rows" value="{{ row[0] }}"></td>
-                    {% for cell in row %}
-                        <td>{{ cell }}</td>
+    <h2>Tablodan Gelen Veriler</h2>
+        <form method="POST" action="{{ url_for('delete_selected_rows', ip=selected_ip, db_name=selected_db, table_name=selected_table) }}">
+            <table>
+                <thead>
+                    <tr>
+                        <th><input type="checkbox" id="select-all" onclick="toggleSelectAll()"></th>
+                        {% for column in fetched_data[0] %}
+                            <th>{{ column }}</th>
+                        {% endfor %}
+                        <th>İşlem</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in fetched_data[1:] %}
+                        <tr id="row-{{ row[0] }}">
+                            <td><input type="checkbox" name="selected_rows" value="{{ row[0] }}"></td>
+                            {% for cell in row %}
+                                <td>{{ cell }}</td>
+                            {% endfor %}
+                            <td>
+                                <a class="update-btn" href="{{ url_for('update_row', 
+                                    ip=selected_ip, 
+                                    db_name=selected_db, 
+                                    table_name=selected_table, 
+                                    row_data=row|join('|'), 
+                                    columns=fetched_data[0]|join('|')
+                                ) }}">
+                                    <button type="button">Güncelle</button>   
+                                </a>
+                                <button type="button" class="btn btn-danger" onclick="deleteRow({{ row[0] }})">Sil</button>
+                            </td>
+                        </tr>
                     {% endfor %}
-                    <td>
-                        <!-- Güncelleme ve Silme Butonları -->
-                        <a class="update-btn" href="{{ url_for('update_row', 
-                            ip=selected_ip, 
-                            db_name=selected_db, 
-                            table_name=selected_table, 
-                            row_data=row|join('|'), 
-                            columns=fetched_data[0]|join('|')
-                        ) }}">
-                            <button type="button">Güncelle</button>   
-                        </a>
-                        <!-- Satır Silme Butonu -->
-                        <button type="button" class="btn btn-danger" onclick="deleteRow({{ row[0] }})">Sil</button>
-                    </td>
-                </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-    
-    <br>
-    <button type="submit" id="delete-btn" class="btn btn-danger">Seçilenleri Sil</button>
-</form>
-{% endif %}
+                </tbody>
+            </table>
+            <br>
+            <button type="submit" id="delete-btn" class="btn btn-danger">Seçilenleri Sil</button>
+        </form>
+    {% endif %}
+    {% if is_empty %}
+        <h3 class="text-danger text-center">Ekipman tablosu boş:</h3>
+    {% endif %}<br>
 
 {% if modem_files %}
-    <h3>Seçtiğiniz Modem'in İçindeki Dosyalar:</h3>
-    <ul>
-        {% for file in modem_files %}
-            <li>{{ file }}</li>
-        {% endfor %}
-    </ul>
+    <h3 class="text-success toggle-header" onclick="toggleFiles()"> 
+        Seçtiğiniz Modem'in İçindeki Dosyalar: 
+        <i id="toggle-icon" class="fa-solid fa-chevron-down"></i>
+    </h3>
+        <table id="file-list" style="display: none;">
+            <thead>
+                <tr>
+                    <th>Dosya Adı</th>
+                    <th>İşlem</th>
+                </tr>
+            </thead>
+            <div>
+                
+            </div>
+            <tbody>
+                {% for file in modem_files %}
+                <tr>
+                    <td>
+                        <i class="fa-solid fa-file"></i> {{ file }}
+                    </td>
+                    <td class="action-cell">
+                        <button class="btn btn-download">İndir</button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
 {% else %}
-    <p class="text-center">Modemin İçindeki Dosyalar Alınamadı.</p>
+<p class="text-center">Modemin İçindeki Dosyalar Alınamadı.</p>
 {% endif %}
 
 <form action="/modbus-scan" method="post">
@@ -112,6 +137,6 @@
     <button type="submit">Tara</button>
 </form>
 
-<script type="text/javascript" src="{{ url_for('static', filename='js/app.js') }}"></script>
-
+<link rel="stylesheet" href="{{ url_for('static', filename='css/file.css') }}" rel=stylesheet>
+<script type="text/javascript" src="{{ url_for('static', filename='js/app.js') }}"></script>  
 {% endblock content %} 

@@ -90,14 +90,17 @@ def fetch_data_from_table(ip, db_name, table_name):
         if len(lines) > 0:
             # İlk satır başlıkları (sütun adlarını) içeriyor
             rows.append(lines[0].split("\t"))
+            if len(lines) == 1:
+                # Tablo sadece başlıklardan oluşuyorsa (veri yoksa)
+                return {"is_empty": True, "data": rows}
         
-        # Veriler (eğer varsa) ekleniyor
+        # Veriler ekleniyor
         for line in lines[1:]:
             rows.append(line.split("\t"))
         
-        return rows
+        return {"is_empty": False, "data": rows}
     except Exception as e:
-        return [[f"Hata: {str(e)}"]]
+        return {"is_empty": False, "data": [[f"Hata: {str(e)}"]]}
 
 def modem_files(ip):
     try:
@@ -162,23 +165,33 @@ def restart_modem(ip):
         logging.error(f"Error restarting modem: {str(e)}")
 
 def fetch_equipment_data(ip):
-    """Fetch equipment data from the IoT database."""
+    """IoT veritabanındaki 'equipments' tablosunu getir."""
     try:
-        connection = pymysql.connect(
-            host=ip,
-            user=SSH_USER,
-            password=SSH_PASSWORD,
-            database="iot",
-            cursorclass=pymysql.cursors.DictCursor
-        )
-        with connection.cursor() as cursor:
-            cursor.execute("SELECT * FROM equipments")
-            result = cursor.fetchall()
-            return result
+        ssh = paramiko.SSHClient()
+        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        ssh.connect(hostname=ip, username=SSH_USER, password=SSH_PASSWORD)
+
+        command = 'mysql -u root -p{} -D iot -e "SELECT * FROM equipments;"'.format(SSH_PASSWORD)
+        stdin, stdout, stderr = ssh.exec_command(command)
+
+        output = stdout.read().decode()
+        ssh.close()
+
+        lines = output.splitlines()
+        rows = []
+        
+        if len(lines) > 0:
+            rows.append(lines[0].split("\t"))
+        
+        if len(lines) > 1:
+            for line in lines[1:]:
+                rows.append(line.split("\t"))
+            return {"is_empty": False, "data": rows}
+        else:
+            return {"is_empty": True, "data": None}
     except Exception as e:
-        logging.error(f"Error fetching equipments data: {str(e)}")
-        logging.debug(f"Connecting to database on IP: {ip}")
-        return None
+        return {"is_empty": False, "data": [[f"Hata: {str(e)}"]]}
+
 
 @app.route("/", methods=["GET", "POST"])
 def index():
@@ -186,7 +199,8 @@ def index():
     fetched_data = None
     databases = None
     tables = None
-    modem_files_result = None 
+    modem_files_result = None
+    is_empty = None  # Default olarak None
 
     selected_ip = request.form.get("selected_ip")
     selected_db = request.form.get("selected_db")
@@ -199,7 +213,9 @@ def index():
             restart_modem(selected_ip)
         elif "fetch_equipment_data" in request.form:
             # Call function to fetch data from the IoT database
-            fetched_data = fetch_equipment_data(selected_ip)
+            equipment_data = fetch_equipment_data(selected_ip)
+            fetched_data = equipment_data["data"]
+            is_empty = equipment_data["is_empty"]
 
     if selected_ip:
         # Seçilen IP için veritabanlarını al
@@ -210,19 +226,24 @@ def index():
         tables = fetch_tables(selected_ip, selected_db)
     if selected_table:
         # Seçilen tabloyu getir
-        fetched_data = fetch_data_from_table(selected_ip, selected_db, selected_table)
+        table_data = fetch_data_from_table(selected_ip, selected_db, selected_table)
+        fetched_data = table_data["data"]
+        is_empty = table_data["is_empty"]
 
+    # Sayfayı her durumda render et
     return render_template(
-        "home_page.html", 
-        devices=devices, 
-        fetched_data=fetched_data, 
-        databases=databases, 
-        tables=tables, 
-        selected_ip=selected_ip, 
-        selected_db=selected_db, 
+        "home_page.html",
+        devices=devices,
+        fetched_data=fetched_data,
+        databases=databases,
+        tables=tables,
+        selected_ip=selected_ip,
+        selected_db=selected_db,
         selected_table=selected_table,
-        modem_files=modem_files_result  # Use the renamed variable
+        modem_files=modem_files_result,
+        is_empty=is_empty
     )
+
 
 @app.route("/update-row", methods=["GET", "POST"])
 def update_row():
