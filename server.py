@@ -4,8 +4,6 @@ import paramiko
 import pymysql.cursors
 import logging
 logging.basicConfig(level=logging.DEBUG)
-from pymodbus.client import ModbusTcpClient
-from pymodbus.client import ModbusSerialClient
 
 app = Flask(__name__)
 
@@ -102,28 +100,6 @@ def fetch_data_from_table(ip, db_name, table_name):
     except Exception as e:
         return {"is_empty": False, "data": [[f"Hata: {str(e)}"]]}
     
-def modbus_scan(ip, port=502, start_address=0, end_address=100):
-    """Modbus cihazında belirtilen adres aralığını tarar."""
-    try:
-        client = ModbusTcpClient(host=ip, port=port)
-        # client = ModbusTcpClient(ip, port)
-        if not client.connect():
-            return {"status": "error", "message": "Modbus cihazına bağlanılamadı."}
-        
-        results = []
-        for address in range(start_address, end_address):
-            try:
-                response = client.read_holding_registers(address, 1, unit=1)
-                if not response.isError():
-                    results.append({"address": address, "value": response.registers[0]})
-            except Exception as e:
-                continue  # Hatalı adresleri atla demek 
-        
-        client.close()
-        return {"status": "success", "data": results}
-    except Exception as e:
-        return {"status": "error", "message": str(e)}
-
 def restart_modem(ip):
     """Restart the modem via SSH."""
     try:
@@ -139,7 +115,7 @@ def restart_modem(ip):
         logging.info(f"Modem restarted at IP: {ip}")
     except Exception as e:
         logging.error(f"Error restarting modem: {str(e)}")
-
+        
 def fetch_equipment_data(ip):
     """IoT veritabanındaki 'equipments' tablosunu getir."""
     try:
@@ -327,15 +303,6 @@ def delete_row():
         return {"success": True}, 200
     except Exception as e:
         return {"success": False, "message": str(e)}, 500
-
-@app.route("/modbus-scan", methods=["POST"])
-def modbus_scan_route():
-    ip = request.form.get("ip")
-    start_address = int(request.form.get("start_address", 0))
-    end_address = int(request.form.get("end_address", 100))
-
-    result = modbus_scan(ip, start_address=start_address, end_address=end_address)
-    return render_template("modbus_scan.html", result=result)
 
 @app.context_processor
 def utility_processor():

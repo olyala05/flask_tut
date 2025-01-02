@@ -92,18 +92,5 @@
         <h3 class="text-danger text-center">Ekipman tablosu boş:</h3>
     {% endif %}<br>
 
-<form action="/modbus-scan" method="post">
-    <label for="ip">Modbus IP Adresi:</label>
-    <input type="text" name="ip" required>
-    
-    <label for="start_address">Başlangıç Adresi:</label>
-    <input type="number" name="start_address" value="0">
-
-    <label for="end_address">Bitiş Adresi:</label>
-    <input type="number" name="end_address" value="100">
-
-    <button type="submit">Tara</button>
-</form>
-
 <script type="text/javascript" src="{{ url_for('static', filename='js/app.js') }}"></script>  
 {% endblock content %} 

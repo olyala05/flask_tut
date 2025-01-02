@@ -1,20 +1,27 @@
-{% extends "layout.html" %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Modbus RTU Tarama</title>
+</head>
+<body>
+    <h1>Modbus RTU Cihazlarını Tara</h1>
+    <form method="POST">
+        <label for="modbus_port">Modbus RTU Port (Örnek: /dev/ttyS0 veya COM1):</label>
+        <input type="text" name="modbus_port" id="modbus_port" required>
+        <button type="submit">Tarama Yap</button>
+    </form>
 
-{% block title %}Modbus'a Bağlı Cihazlar{% endblock title %}
-
-{% block content %}
-
-{% if result.status == "success" %}
-    <h3>Modbus Taraması Başarılı</h3>
-    <ul>
-        {% for item in result.data %}
-            <li>Adres: {{ item.address }} - Değer: {{ item.value }}</li>
+    {% if modbus_devices %}
+        <h2>Bulunan Cihazlar:</h2>
+        <ul>
+        {% for device in modbus_devices %}
+            <li>Cihaz ID: {{ device }}</li>
         {% endfor %}
-    </ul>
-{% else %}
-    <h3>Hata</h3>
-    <p>{{ result.message }}</p>
-{% endif %}
-
-{% endblock content %}
-
+        </ul>
+    {% elif modbus_devices is not none %}
+        <p>Hiçbir cihaz bulunamadı.</p>
+    {% endif %}
+</body>
+</html>
