@@ -101,30 +101,6 @@ def fetch_data_from_table(ip, db_name, table_name):
         return {"is_empty": False, "data": rows}
     except Exception as e:
         return {"is_empty": False, "data": [[f"Hata: {str(e)}"]]}
-
-def modem_files(ip):
-    try:
-        ssh = paramiko.SSHClient()
-        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        ssh.connect(hostname=ip, username=SSH_USER, password=SSH_PASSWORD)
-
-        # Modem dosyalarını listeleme komutu
-        command = "ls"
-        stdin, stdout, stderr = ssh.exec_command(command)
-
-        output = stdout.read().decode("utf-8")
-        error_output = stderr.read().decode("utf-8")
-        ssh.close()
-
-        if error_output:
-            print(f"Hata: {error_output}")
-            raise Exception(f"Komut hatası: {error_output}")
-
-        files = output.splitlines()
-        return files
-    except Exception as e:
-        print(f"Hata: {str(e)}")
-        return [[f"Hata: {str(e)}"]]
     
 def modbus_scan(ip, port=502, start_address=0, end_address=100):
     """Modbus cihazında belirtilen adres aralığını tarar."""
@@ -192,15 +168,13 @@ def fetch_equipment_data(ip):
     except Exception as e:
         return {"is_empty": False, "data": [[f"Hata: {str(e)}"]]}
 
-
 @app.route("/", methods=["GET", "POST"])
 def index():
     devices = get_connected_devices()
     fetched_data = None
     databases = None
     tables = None
-    modem_files_result = None
-    is_empty = None  # Default olarak None
+    is_empty = None
 
     selected_ip = request.form.get("selected_ip")
     selected_db = request.form.get("selected_db")
@@ -220,7 +194,6 @@ def index():
     if selected_ip:
         # Seçilen IP için veritabanlarını al
         databases = fetch_databases(selected_ip)
-        modem_files_result = modem_files(selected_ip)  # Call the function here
     if selected_db:
         # Seçilen veritabanı için tabloları al
         tables = fetch_tables(selected_ip, selected_db)
@@ -240,10 +213,8 @@ def index():
         selected_ip=selected_ip,
         selected_db=selected_db,
         selected_table=selected_table,
-        modem_files=modem_files_result,
         is_empty=is_empty
     )
-
 
 @app.route("/update-row", methods=["GET", "POST"])
 def update_row():
