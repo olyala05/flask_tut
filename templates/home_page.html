@@ -33,8 +33,15 @@
             {% endfor %}
         </select>
     {% endif %}
+    <br><br>
+    <button type="submit" class="btn btn-success">Seçilen Ip'nin Verileri'ni Getir</button>
 
-    <button type="submit">Verileri Göster</button>
+    <button type="submit" name="fetch_equipment_data" class="btn btn-primary">Ekipman Verilerini Getir</button>
+
+    <button type="submit" name="restart_modem" class="btn btn-danger" onclick="confirmRestart()">
+        <i class="fa-solid fa-rotate-left"></i> Modemi Yeniden Başlat
+    </button>
+
 </form>
 
 {% if fetched_data %}
@@ -75,49 +82,36 @@
             {% endfor %}
         </tbody>
     </table>
+    
     <br>
     <button type="submit" id="delete-btn" class="btn btn-danger">Seçilenleri Sil</button>
 </form>
 {% endif %}
 
 {% if modem_files %}
-    <h3>Modem Dosyaları:</h3>
+    <h3>Seçtiğiniz Modem'in İçindeki Dosyalar:</h3>
     <ul>
         {% for file in modem_files %}
             <li>{{ file }}</li>
         {% endfor %}
     </ul>
 {% else %}
-    <p>Modem dosyaları alınamadı.</p>
+    <p class="text-center">Modemin İçindeki Dosyalar Alınamadı.</p>
 {% endif %}
 
-<script>
-    function toggleSelectAll() {
-        var selectAll = document.getElementById("select-all");
-        var checkboxes = document.getElementsByName("selected_rows");
-        for (var i = 0; i < checkboxes.length; i++) {
-            checkboxes[i].checked = selectAll.checked;
-        }
-    }
+<form action="/modbus-scan" method="post">
+    <label for="ip">Modbus IP Adresi:</label>
+    <input type="text" name="ip" required>
+    
+    <label for="start_address">Başlangıç Adresi:</label>
+    <input type="number" name="start_address" value="0">
 
-    function deleteRow(rowId) {
-        // Burada AJAX veya başka bir yöntem ile yalnızca seçilen satırı silmeye yönelik bir işlem
-        if (confirm("Bu satırı silmek istediğinizden emin misiniz?")) {
-            var row = document.getElementById("row-" + rowId);
-            row.parentNode.removeChild(row);
-            fetch(`/delete_row/${rowId}`, {
-                method: 'DELETE',
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    alert("Satır başarıyla silindi.");
-                } else {
-                    alert("Silme işlemi başarısız oldu.");
-                }
-            });
-        }
-    }
-</script>
+    <label for="end_address">Bitiş Adresi:</label>
+    <input type="number" name="end_address" value="100">
+
+    <button type="submit">Tara</button>
+</form>
+
+<script type="text/javascript" src="{{ url_for('static', filename='js/app.js') }}"></script>
 
 {% endblock content %} 

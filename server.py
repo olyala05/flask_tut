@@ -4,6 +4,8 @@ import paramiko
 import pymysql.cursors
 import logging
 logging.basicConfig(level=logging.DEBUG)
+from pymodbus.client import ModbusTcpClient
+from pymodbus.client import ModbusSerialClient
 
 app = Flask(__name__)
 
@@ -103,7 +105,8 @@ def modem_files(ip):
         ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         ssh.connect(hostname=ip, username=SSH_USER, password=SSH_PASSWORD)
 
-        command = "ls /etc/"
+        # Modem dosyalarını listeleme komutu
+        command = "ls"
         stdin, stdout, stderr = ssh.exec_command(command)
 
         output = stdout.read().decode("utf-8")
@@ -119,6 +122,63 @@ def modem_files(ip):
     except Exception as e:
         print(f"Hata: {str(e)}")
         return [[f"Hata: {str(e)}"]]
+    
+def modbus_scan(ip, port=502, start_address=0, end_address=100):
+    """Modbus cihazında belirtilen adres aralığını tarar."""
+    try:
+        client = ModbusTcpClient(host=ip, port=port)
+        # client = ModbusTcpClient(ip, port)
+        if not client.connect():
+            return {"status": "error", "message": "Modbus cihazına bağlanılamadı."}
+        
+        results = []
+        for address in range(start_address, end_address):
+            try:
+                response = client.read_holding_registers(address, 1, unit=1)
+                if not response.isError():
+                    results.append({"address": address, "value": response.registers[0]})
+            except Exception as e:
+                continue  # Hatalı adresleri atla demek 
+        
+        client.close()
+        return {"status": "success", "data": results}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+def restart_modem(ip):
+    """Restart the modem via SSH."""
+    try:
+        ssh = paramiko.SSHClient()
+        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        ssh.connect(hostname=ip, username=SSH_USER, password=SSH_PASSWORD)
+
+        # Restart modem command (modify as needed)
+        command = "reboot"  # or the specific command to restart the modem
+        ssh.exec_command(command)
+        ssh.close()
+
+        logging.info(f"Modem restarted at IP: {ip}")
+    except Exception as e:
+        logging.error(f"Error restarting modem: {str(e)}")
+
+def fetch_equipment_data(ip):
+    """Fetch equipment data from the IoT database."""
+    try:
+        connection = pymysql.connect(
+            host=ip,
+            user=SSH_USER,
+            password=SSH_PASSWORD,
+            database="iot",
+            cursorclass=pymysql.cursors.DictCursor
+        )
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT * FROM equipments")
+            result = cursor.fetchall()
+            return result
+    except Exception as e:
+        logging.error(f"Error fetching equipments data: {str(e)}")
+        logging.debug(f"Connecting to database on IP: {ip}")
+        return None
 
 @app.route("/", methods=["GET", "POST"])
 def index():
@@ -126,15 +186,25 @@ def index():
     fetched_data = None
     databases = None
     tables = None
-    modem_files = None
+    modem_files_result = None 
 
     selected_ip = request.form.get("selected_ip")
     selected_db = request.form.get("selected_db")
     selected_table = request.form.get("selected_table")
 
+    # Check for button presses
+    if request.method == "POST":
+        if "restart_modem" in request.form:
+            # Call modem restart logic
+            restart_modem(selected_ip)
+        elif "fetch_equipment_data" in request.form:
+            # Call function to fetch data from the IoT database
+            fetched_data = fetch_equipment_data(selected_ip)
+
     if selected_ip:
         # Seçilen IP için veritabanlarını al
         databases = fetch_databases(selected_ip)
+        modem_files_result = modem_files(selected_ip)  # Call the function here
     if selected_db:
         # Seçilen veritabanı için tabloları al
         tables = fetch_tables(selected_ip, selected_db)
@@ -151,7 +221,7 @@ def index():
         selected_ip=selected_ip, 
         selected_db=selected_db, 
         selected_table=selected_table,
-        modem_files=modem_files
+        modem_files=modem_files_result  # Use the renamed variable
     )
 
 @app.route("/update-row", methods=["GET", "POST"])
@@ -235,7 +305,46 @@ def delete_selected_rows():
         return redirect(url_for("index"))
     except Exception as e:
         return {"success": False, "message": str(e)}, 500
-    
+      
+@app.route("/delete-row", methods=["POST"])
+def delete_row():
+    try:
+        data = request.get_json()
+        row_id = data.get('row_id')
+        ip = request.args.get("ip")
+        db_name = request.args.get("db_name")
+        table_name = request.args.get("table_name")
+
+        if not row_id:
+            return {"success": False, "message": "Satır ID'si sağlanmadı"}, 400
+
+        # Silme komutunu oluştur
+        command = (
+            f"mysql -u root -p{SSH_PASSWORD} -D {db_name} -e "
+            f"\"DELETE FROM {table_name} WHERE id='{row_id}';\""
+        )
+
+        ssh = paramiko.SSHClient()
+        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        ssh.connect(hostname=ip, username=SSH_USER, password=SSH_PASSWORD)
+
+        # Silme komutunu çalıştır
+        ssh.exec_command(command)
+        ssh.close()
+
+        return {"success": True}, 200
+    except Exception as e:
+        return {"success": False, "message": str(e)}, 500
+
+@app.route("/modbus-scan", methods=["POST"])
+def modbus_scan_route():
+    ip = request.form.get("ip")
+    start_address = int(request.form.get("start_address", 0))
+    end_address = int(request.form.get("end_address", 100))
+
+    result = modbus_scan(ip, start_address=start_address, end_address=end_address)
+    return render_template("modbus_scan.html", result=result)
+
 @app.context_processor
 def utility_processor():
     return dict(zip=zip)

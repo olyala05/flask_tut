@@ -1,6 +1,7 @@
 {% extends "layout.html" %}
 
 {% block title %}Güncelleme Sayfası{% endblock title %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}" rel=stylesheet>
 
 {% block content %}
 <h1>Veri Güncelle</h1>
@@ -44,5 +45,7 @@
         });
     {% endif %}
 </script>
+
+<script type="text/javascript" src="{{ url_for('static', filename='js/app.js') }}"></script>
 
 {% endblock content %}

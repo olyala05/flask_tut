@@ -1,0 +1,20 @@
+{% extends "layout.html" %}
+
+{% block title %}Modbus'a Bağlı Cihazlar{% endblock title %}
+
+{% block content %}
+
+{% if result.status == "success" %}
+    <h3>Modbus Taraması Başarılı</h3>
+    <ul>
+        {% for item in result.data %}
+            <li>Adres: {{ item.address }} - Değer: {{ item.value }}</li>
+        {% endfor %}
+    </ul>
+{% else %}
+    <h3>Hata</h3>
+    <p>{{ result.message }}</p>
+{% endif %}
+
+{% endblock content %}
+
