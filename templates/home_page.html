@@ -36,11 +36,10 @@
     <br><br>
     <button type="submit" class="btn btn-success">Seçilen Ip'nin Verileri'ni Getir</button>
 
-    {# <button type="submit" name="fetch_equipment_data" class="btn btn-primary">Ekipman Verilerini Getir</button> #}
-    
-    <button type="submit" name="fetch_equipment_data" class="btn btn-primary">
-        Modemin Ekipmanlarını Getir
-    </button>
+    <button type="submit" name="fetch_modems_data" value="true" class="btn btn-primary">Modems</button>
+
+    <button type="submit" name="fetch_equipment_data" class="btn btn-primary">Equipments</button>
+
     <button type="submit" name="restart_modem" class="btn btn-danger" onclick="confirmRestart()">
         <i class="fa-solid fa-rotate-left"></i> Modemi Yeniden Başlat
     </button>
@@ -91,6 +90,56 @@
     {% if is_empty %}
         <h3 class="text-danger text-center">Ekipman tablosu boş:</h3>
     {% endif %}<br>
+
+    <form method="post" action="/fetch-modbus-data">
+        <label for="ip">Cihaz IP:</label>
+        <input type="text" id="ip" name="ip" required>
+    
+        <label for="port">Port:</label>
+        <input type="number" id="port" name="port" value="502">
+    
+        <label for="unit_id">Unit ID:</label>
+        <input type="number" id="unit_id" name="unit_id" value="1">
+    
+        <label for="start_address">Başlangıç Adresi:</label>
+        <input type="number" id="start_address" name="start_address" value="0">
+    
+        <label for="count">Okunacak Veri Sayısı:</label>
+        <input type="number" id="count" name="count" value="10">
+    
+        <button type="submit">Verileri Getir</button>
+    </form>
+    
+
+    <form method="post">
+        <label for="device_port">Cihaz Portu:</label>
+        <input type="text" id="device_port" name="device_port" placeholder="Örneğin: /dev/ttyUSB0">
+        <label for="start_address">Başlangıç Adresi:</label>
+        <input type="number" id="start_address" name="start_address" value="0">
+        <label for="end_address">Bitiş Adresi:</label>
+        <input type="number" id="end_address" name="end_address" value="10">
+        <button type="submit">Tara</button>
+    </form>
+    
+    {% if modbus_data %}
+        <h2>Modbus Verileri</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Adres</th>
+                    <th>Değer</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for address, value in modbus_data.items() %}
+                    <tr>
+                        <td>{{ address }}</td>
+                        <td>{{ value }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% endif %}
 
 <script type="text/javascript" src="{{ url_for('static', filename='js/app.js') }}"></script>  
 {% endblock content %} 
