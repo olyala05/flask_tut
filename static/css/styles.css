@@ -75,3 +75,60 @@ tr:hover {
         width: 100%;
     }
 }
+
+
+
+/* Tablo düzenlemeleri */
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+    background-color: #fff;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    table-layout: fixed; /* Kolonların eşit genişlikte olmasını sağlar */
+}
+
+th, td {
+    padding: 12px;
+    text-align: left;
+    border: 1px solid #ddd;
+    word-wrap: break-word; /* Uzun kelimelerin kırılmasını sağlar */
+    overflow: hidden; /* Taşan içerikleri gizler */
+}
+
+th {
+    background-color: #f4f4f4;
+    color: #333;
+}
+
+tr:nth-child(even) {
+    background-color: #f9f9f9;
+}
+
+tr:hover {
+    background-color: #f1f1f1;
+}
+
+/* Veriler çoksa yazı boyutunu küçült */
+table {
+    font-size: 14px; /* Varsayılan yazı boyutu */
+}
+
+table td, table th {
+    overflow: hidden; /* Yatay kaydırma engellenir */
+    text-overflow: ellipsis; /* Taşan metinler üç nokta ile gösterilir */
+}
+
+@media (max-width: 768px) {
+    select, button {
+        width: 100%;
+    }
+
+    table {
+        font-size: 12px; /* Mobilde yazı boyutunu küçült */
+    }
+
+    th, td {
+        padding: 8px; /* Mobilde daha az padding */
+    }
+}

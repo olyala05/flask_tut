@@ -5,6 +5,7 @@ import pymysql.cursors
 import logging
 from pymodbus.client.sync import ModbusTcpClient
 from pymodbus.client.sync import ModbusSerialClient
+from flask import jsonify
 logging.basicConfig(level=logging.DEBUG)
 
 app = Flask(__name__)
@@ -14,6 +15,22 @@ SSH_HOST = os.getenv("SSH_HOST", "localhost")
 SSH_USER = os.getenv("SSH_USER", "root")
 SSH_PASSWORD = os.getenv("SSH_PASSWORD", "123")
 
+def ssh_connect(ip, username, password):
+    """SSH bağlantısı kurar ve komut gönderir."""
+    try:
+        client = paramiko.SSHClient()
+        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        client.connect(ip, username=username, password=password)
+
+        # Burada cihazdan alınacak bilgileri SSH komutu ile alabilirsiniz
+        stdin, stdout, stderr = client.exec_command("ls /")  # Örnek komut
+        output = stdout.read().decode()
+
+        client.close()
+        return output
+    except Exception as e:
+        return f"Hata: {str(e)}"
+    
 def get_connected_devices():
     """Wi-Fi'ye bağlı cihazların IP adreslerini ve MAC adreslerini listele"""
     result = os.popen("arp -a").read()
@@ -174,42 +191,14 @@ def fetch_modems_data(ip):
     except Exception as e:
         return {"is_empty": False, "data": [[f"Error: {str(e)}"]]}
 
-def fetch_modbus_data(ip, port, unit_id, start_address, count):
-    """
-    Modbus cihazından veri okuma.
-    :param ip: Modbus cihazının IP adresi
-    :param port: Modbus portu (genellikle 502)
-    :param unit_id: Slave ID (cihazın adresi)
-    :param start_address: Başlangıç adresi
-    :param count: Okunacak veri sayısı
-    :return: Okunan veriler listesi
-    """
-    try:
-        client = ModbusTcpClient(ip, port=port)
-        connection = client.connect()
-        
-        if not connection:
-            return {"error": "Modbus cihazına bağlanılamadı"}
-
-        # Modbus holding register okuma
-        response = client.read_holding_registers(start_address, count, unit=unit_id)
-        client.close()
-
-        if response.isError():
-            return {"error": f"Modbus hatası: {response}"}
-
-        return {"data": response.registers}
-    except Exception as e:
-        return {"error": str(e)}
-    
-def read_modbus_data(device_port, slave_id, register_address, count=1):
+def read_modbus_data(device_port, slave_id, register_address, baudrate, count=1, stopbits=1):
     """Modbus cihazından veri okur."""
     try:
         client = ModbusSerialClient(
             method='rtu',
             port=device_port,
-            baudrate=9600,
-            stopbits=1,
+            baudrate=baudrate, 
+            stopbits=stopbits, 
             bytesize=8,
             parity='N',
             timeout=1
@@ -223,22 +212,34 @@ def read_modbus_data(device_port, slave_id, register_address, count=1):
         if response.isError():
             raise Exception(f"Modbus hatası: {response}")
         
+        # Kontrol ekleyin: response.registers None olabilir
+        if response.registers is None:
+            raise Exception(f"Veri alınamadı, response.registers None.")
+        
         client.close()
         return response.registers  # Kayıt değerleri
     except Exception as e:
         return f"Hata: {str(e)}"
-    
-def scan_modbus_devices(device_port, start_address, end_address, slave_id=1):
-    """Modbus cihazındaki belirli bir aralıktaki tüm kayıtları okur."""
+
+def scan_modbus_devices(device_port, slave_id=1):
+    """Modbus cihazındaki 1-20 adres aralığındaki tüm kayıtları okur."""
     data = {}
+    start_address = 1
+    end_address = 20
     for address in range(start_address, end_address + 1):
         try:
             value = read_modbus_data(device_port, slave_id, address)
-            data[address] = value
+            
+            # value None ise hata mesajı ver
+            if "Hata" in value:
+                data[address] = value
+            else:
+                data[address] = value
         except Exception as e:
             data[address] = f"Hata: {str(e)}"
     return data
-    
+
+
 @app.route("/", methods=["GET", "POST"])
 def index():
     modbus_data = None
@@ -271,13 +272,7 @@ def index():
             modems_data = fetch_modems_data(selected_ip)
             fetched_data = modems_data["data"]
             is_empty = modems_data["is_empty"]
-
-    if selected_ip:
-        # Seçilen IP için veritabanlarını al
-        databases = fetch_databases(selected_ip)
-    if selected_db:
-        # Seçilen veritabanı için tabloları al
-        tables = fetch_tables(selected_ip, selected_db)
+            
     if selected_table:
         # Seçilen tabloyu getir
         table_data = fetch_data_from_table(selected_ip, selected_db, selected_table)
@@ -301,6 +296,24 @@ def index():
         modbus_data=modbus_data
     )
 
+@app.route("/fetch-modbus-data", methods=["POST"])
+def fetch_modbus_data_route():
+    try:
+        # Formdan gelen veriler
+        device_port = request.form.get("device_port")
+        baudrate = int(request.form.get("baudrate", 9600))
+        stopbits = int(request.form.get("stopbits", 1))
+        slave_id = int(request.form.get("slave_id", 1))
+        start_address = int(request.form.get("start_address", 1))
+        end_address = int(request.form.get("end_address", 20))
+
+        # Modbus verisini al
+        modbus_data = scan_modbus_devices(device_port, slave_id)
+
+        return render_template("home_page.html", modbus_data=modbus_data)
+
+    except Exception as e:
+        return f"Hata: {str(e)}"
 
 @app.route("/update-row", methods=["GET", "POST"])
 def update_row():
@@ -414,56 +427,10 @@ def delete_row():
     except Exception as e:
         return {"success": False, "message": str(e)}, 500
 
-@app.route("/fetch-modbus-data", methods=["POST"])
-def fetch_modbus_data_route():
-    """
-    Modbus cihazından veri almak için bir rota.
-    """
-    try:
-        ip = request.form.get("ip")
-        port = int(request.form.get("port", 502))  # Varsayılan Modbus portu 502
-        unit_id = int(request.form.get("unit_id", 1))  # Varsayılan slave ID 1
-        start_address = int(request.form.get("start_address", 0))
-        count = int(request.form.get("count", 10))
-
-        result = fetch_modbus_data(ip, port, unit_id, start_address, count)
-
-        if "error" in result:
-            return {"success": False, "message": result["error"]}, 500
-
-        return {"success": True, "data": result["data"]}
-    except Exception as e:
-        return {"success": False, "message": str(e)}, 500
-
-def read_modbus_data(device_port, slave_id, register_address, count=1):
-    """Modbus cihazından veri okur."""
-    try:
-        client = ModbusSerialClient(
-            method='rtu',
-            port=device_port,
-            baudrate=9600,
-            stopbits=1,
-            bytesize=8,
-            parity='N',
-            timeout=1
-        )
-        
-        if not client.connect():
-            raise Exception(f"Modbus cihazına bağlanılamadı: {device_port}")
-        
-        response = client.read_holding_registers(address=register_address, count=count, unit=slave_id)
-        
-        if response.isError():
-            raise Exception(f"Modbus hatası: {response}")
-        
-        client.close()
-        return response.registers  # Kayıt değerleri
-    except Exception as e:
-        return f"Hata: {str(e)}"
-    
 @app.context_processor
 def utility_processor():
     return dict(zip=zip)
+
 
 if __name__ == "__main__":
     app.run(debug=True, port=8080)
