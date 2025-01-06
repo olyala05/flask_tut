@@ -20,10 +20,11 @@
             <button type="submit" name="fetch_equipment_data" class="btn btn-primary"><i class="fa-solid fa-screwdriver-wrench"></i> Equipments</button>
             <button id="modbusButton" class="btn btn-primary"><i class="fa-brands fa-usb"></i> Modbus</button>
         </div>
-    
-        <div>
-            <button type="submit" name="restart_modem" class="btn btn-danger" onclick="confirmRestart()"><i class="fa-solid fa-rotate-left"></i> Reboot Modem</button>
-        </div>
+
+        <button type="submit" name="restart_modem" class="btn btn-danger" onclick="return confirmRestart()">
+            <i class="fa-solid fa-rotate-left"></i> Reboot Modem
+        </button>
+        
     </div>
     
 </form>
@@ -40,38 +41,40 @@
     </h2>
     
     <form method="POST" action="{{ url_for('delete_selected_rows', ip=selected_ip, db_name=selected_db, table_name=selected_table) }}">
-        <table>
-            <thead>
-                <tr>
-                    <th><input type="checkbox" id="select-all" onclick="toggleSelectAll()"></th>
-                    {% for column in fetched_data[0] %}
-                        <th>{{ column }}</th>
-                    {% endfor %}
-                    <th>Process</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for row in fetched_data[1:] %}
-                    <tr id="row-{{ row[0] }}">
-                        <td><input type="checkbox" name="selected_rows" value="{{ row[0] }}"></td>
-                        {% for cell in row %}
-                            <td>{{ cell }}</td>
+        <div style="max-height: 500px; overflow-y: auto; border: 1px solid #ccc; padding: 10px;">
+            <table>
+                <thead>
+                    <tr>
+                        <th><input type="checkbox" id="select-all" onclick="toggleSelectAll()"></th>
+                        {% for column in fetched_data[0] %}
+                            <th>{{ column }}</th>
                         {% endfor %}
-                        <td>
-                            <a class="update-btn" href="{{ url_for('update_row', 
-                                ip=selected_ip, 
-                                db_name=selected_db, 
-                                table_name=selected_table, 
-                                row_data=row|join('|'), 
-                                columns=fetched_data[0]|join('|')
-                            ) }}">
-                                <button type="button" class="btn btn-warning"> <i class="fa-solid fa-pen"></i> Edit</button>   
-                            </a>
-                        </td>
+                        <th>Process</th>
                     </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+                </thead>
+                <tbody>
+                    {% for row in fetched_data[1:] %}
+                        <tr id="row-{{ row[0] }}">
+                            <td><input type="checkbox" name="selected_rows" value="{{ row[0] }}"></td>
+                            {% for cell in row %}
+                                <td>{{ cell }}</td>
+                            {% endfor %}
+                            <td>
+                                <a class="update-btn" href="{{ url_for('update_row', 
+                                    ip=selected_ip, 
+                                    db_name=selected_db, 
+                                    table_name=selected_table, 
+                                    row_data=row|join('|'), 
+                                    columns=fetched_data[0]|join('|')
+                                ) }}">
+                                    <button type="button" class="btn btn-warning"> <i class="fa-solid fa-pen"></i> Edit</button>   
+                                </a>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
         <br>
         <button type="submit" id="delete-btn" class="btn btn-danger"><i class="fa-solid fa-trash"></i> Delete Selected</button>
     </form>
@@ -91,110 +94,48 @@
 <br>
 
 <div id="modbusForm" style="display: none; margin-top: 20px;">
-    <form method="post" id="modbusFormContent" action="/fetch-modbus-data" style="margin: auto;">
-        <div style="display: flex; align-items: center; margin-bottom: 10px;">
-            <label for="device_port" style="width: 150px;">Port:</label>
-            <input type="text" id="device_port" name="device_port" placeholder="/dev/ttyUSB0" required style="flex: 1;">
-        </div>
-
-        <div style="display: flex; align-items: center; margin-bottom: 10px;">
-            <label for="baudrate" style="width: 150px;">Baudrate:</label>
-            <input type="number" id="baudrate" name="baudrate" placeholder="9600" required style="flex: 1;">
-        </div>
-
-        <div style="display: flex; align-items: center; margin-bottom: 10px;">
-            <label for="parity" style="width: 150px;">Parity:</label>
-            <select id="parity" name="parity" style="flex: 1;">
-                <option value="N">None</option>
-                <option value="E">Even</option>
-                <option value="O">Odd</option>
-            </select>
-        </div>
-
-        <div style="display: flex; align-items: center; margin-bottom: 10px;">
-            <label for="stopbits" style="width: 150px;">Stopbits:</label>
-            <input type="number" id="stopbits" name="stopbits" value="1" required style="flex: 1;">
-        </div>
-        <div style="display: flex; align-items: center; margin-bottom: 10px;">
-            <label for="start_address" style="width: 150px;">Start Address:</label>
-            <input type="number" id="start_address" name="start_address" value="1" required style="flex: 1;">
-        </div>
-        
-        <div style="display: flex; align-items: center; margin-bottom: 10px;">
-            <label for="end_address" style="width: 150px;">End Address:</label>
-            <input type="number" id="end_address" name="end_address" value="20" required style="flex: 1;">
-        </div>
-
-        <div style="display: flex; align-items: center; margin-bottom: 10px;">
-            <label for="slave_id" style="width: 150px;">Slave ID:</label>
-            <input type="number" id="slave_id" name="slave_id" required style="flex: 1;">
-        </div>
-        
-        <div style="display: flex; align-items: center; margin-bottom: 10px;">
-            <label for="register_address" style="width: 150px;">Register Address:</label>
-            <input type="number" id="register_address" name="register_address" required style="flex: 1;">
-        </div>
-        
-        <div style="display: flex; align-items: center; margin-bottom: 10px;">
-            <label for="register_value" style="width: 150px;">Register Value:</label>
-            <input type="number" id="register_value" name="register_value" required style="flex: 1;">
-        </div>
-
-        <div style="margin-left: 150px;">
-            <button type="submit" class="btn btn-success">Get Data</button>
-        </div>
+    <form method="post">
+        <label for="selected_ip">Cihaz IP Seçin:</label>
+        <select id="selected_ip" name="selected_ip">
+            <option value="">Seçiniz...</option>
+            {% for device in devices %}
+                <option value="{{ device }}" {% if device == selected_ip %}selected{% endif %}>{{ device }}</option>
+            {% endfor %}
+        </select>
+    
+        <h3>Modbus Parametreleri:</h3>
+        <input type="text" name="device_port" placeholder="Port (örn: COM1)" required>
+        <input type="number" name="baudrate" placeholder="Baudrate (örn: 9600)" required>
+        <select name="parity">
+            <option value="N">None</option>
+            <option value="E">Even</option>
+            <option value="O">Odd</option>
+        </select>
+        <input type="number" name="stopbits" placeholder="Stopbits (örn: 1)" required>
+        <input type="number" name="start_address" placeholder="Başlangıç Adresi" required>
+        <input type="number" name="end_address" placeholder="Bitiş Adresi" required>
+        <input type="number" name="slave_id" placeholder="Slave ID" required>
+    
+        <button type="submit" name="action" value="modbus">Modbus Verilerini Getir</button>
     </form>
 </div>
 
 
 {% if modbus_data %}
-<h2>Modbus Data</h2>
-<table>
-    <thead>
+    <h2>Modbus Verileri:</h2>
+    <table>
         <tr>
-            <th>Address</th>
-            <th>Value</th>
+            <th>Adres</th>
+            <th>Değer</th>
         </tr>
-    </thead>
-    <tbody>
         {% for address, value in modbus_data.items() %}
             <tr>
                 <td>{{ address }}</td>
                 <td>{{ value }}</td>
             </tr>
         {% endfor %}
-    </tbody>
-</table>
+    </table>
 {% endif %}
 
-
-<script type="text/javascript" src="{{ url_for('static', filename='js/app.js') }}"></script> 
-<script>
-    // Modbus 
-document.getElementById('modbusButton').addEventListener('click', function (e) {
-    e.preventDefault(); // Sayfa yenilenmesini önler
-    const selectedIP = document.getElementById('selected_ip').value;
-
-    if (!selectedIP) {
-        alert('Lütfen bir cihaz seçiniz!');
-        return;
-    }
-
-    // Modbus formunu göster
-    document.getElementById('modbusForm').style.display = 'block';
-
-    // Seçilen IP'yi bir gizli input alanında sakla
-    const modbusFormContent = document.getElementById('modbusFormContent');
-    let hiddenIPField = document.getElementById('hidden_ip_field');
-    if (!hiddenIPField) {
-        hiddenIPField = document.createElement('input');
-        hiddenIPField.type = 'hidden';
-        hiddenIPField.name = 'device_ip';
-        hiddenIPField.id = 'hidden_ip_field';
-        modbusFormContent.appendChild(hiddenIPField);
-    }
-    hiddenIPField.value = selectedIP;
-});
-
-</script> 
+<script type="text/javascript" src="{{ url_for('static', filename='js/app.js') }}"></script>  
 {% endblock content %} 

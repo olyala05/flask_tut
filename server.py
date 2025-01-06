@@ -1,10 +1,10 @@
-from flask import Flask, render_template, request, redirect, url_for
+from flask import Flask, render_template, request, redirect, url_for, send_from_directory
 import os
 import paramiko
 import pymysql.cursors
 import logging
-from pymodbus.client.sync import ModbusTcpClient
-from pymodbus.client.sync import ModbusSerialClient
+from pymodbus.client import ModbusTcpClient
+from pymodbus.client import ModbusSerialClient
 from flask import jsonify
 logging.basicConfig(level=logging.DEBUG)
 
@@ -16,20 +16,15 @@ SSH_USER = os.getenv("SSH_USER", "root")
 SSH_PASSWORD = os.getenv("SSH_PASSWORD", "123")
 
 def ssh_connect(ip, username, password):
-    """SSH bağlantısı kurar ve komut gönderir."""
+    """SSH ile IP'ye bağlanır ve doğrular."""
     try:
         client = paramiko.SSHClient()
         client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         client.connect(ip, username=username, password=password)
-
-        # Burada cihazdan alınacak bilgileri SSH komutu ile alabilirsiniz
-        stdin, stdout, stderr = client.exec_command("ls /")  # Örnek komut
-        output = stdout.read().decode()
-
         client.close()
-        return output
+        return True
     except Exception as e:
-        return f"Hata: {str(e)}"
+        return f"SSH Hatası: {str(e)}"
     
 def get_connected_devices():
     """Wi-Fi'ye bağlı cihazların IP adreslerini ve MAC adreslerini listele"""
@@ -221,24 +216,15 @@ def read_modbus_data(device_port, slave_id, register_address, baudrate, count=1,
     except Exception as e:
         return f"Hata: {str(e)}"
 
-def scan_modbus_devices(device_port, slave_id=1):
-    """Modbus cihazındaki 1-20 adres aralığındaki tüm kayıtları okur."""
+def scan_modbus_devices(device_port, slave_id=1, start_address=1, end_address=20):
     data = {}
-    start_address = 1
-    end_address = 20
     for address in range(start_address, end_address + 1):
         try:
             value = read_modbus_data(device_port, slave_id, address)
-            
-            # value None ise hata mesajı ver
-            if "Hata" in value:
-                data[address] = value
-            else:
-                data[address] = value
+            data[address] = value if "Hata" not in value else None
         except Exception as e:
             data[address] = f"Hata: {str(e)}"
     return data
-
 
 @app.route("/", methods=["GET", "POST"])
 def index():
@@ -246,6 +232,7 @@ def index():
     device_port = request.form.get("device_port")
     start_address = int(request.form.get("start_address", 0))
     end_address = int(request.form.get("end_address", 10))
+    slave_id = int(request.form.get("slave_id", 1))
 
     devices = get_connected_devices()
     fetched_data = None
@@ -281,6 +268,47 @@ def index():
 
     if request.method == "POST" and device_port:
         modbus_data = scan_modbus_devices(device_port, start_address, end_address)
+
+
+    if request.method == 'POST':
+        selected_ip = request.form.get("selected_ip")
+
+        if not selected_ip:
+            return jsonify({"error": "Lütfen bir IP seçin!"}), 400
+
+        if request.form.get("action") == "modbus":
+            ssh_result = ssh_connect(selected_ip, SSH_USER, SSH_PASSWORD)
+            if ssh_result is not True:
+                return jsonify({"error": ssh_result}), 400
+
+            # Modbus bilgilerini al
+            modbus_params = {
+                "port": request.form.get("device_port"),
+                "baudrate": int(request.form.get("baudrate")),
+                "parity": request.form.get("parity"),
+                "stopbits": int(request.form.get("stopbits")),
+                "start_address": int(request.form.get("start_address")),
+                "end_address": int(request.form.get("end_address")),
+                "slave_id": int(request.form.get("slave_id"))
+            }
+
+            try:
+                client = ModbusTcpClient(selected_ip)
+                client.connect()
+                response = client.read_holding_registers(
+                    address=modbus_params["start_address"],
+                    count=modbus_params["end_address"] - modbus_params["start_address"] + 1,
+                    unit=modbus_params["slave_id"]
+                )
+                client.close()
+
+                modbus_data = {
+                    i + modbus_params["start_address"]: reg
+                    for i, reg in enumerate(response.registers)
+                }
+
+            except Exception as e:
+                modbus_data = f"Modbus Hatası: {str(e)}"
 
     # Sayfayı her durumda render et
     return render_template(
@@ -397,40 +425,9 @@ def delete_selected_rows():
     except Exception as e:
         return {"success": False, "message": str(e)}, 500
       
-@app.route("/delete-row", methods=["POST"])
-def delete_row():
-    try:
-        data = request.get_json()
-        row_id = data.get('row_id')
-        ip = request.args.get("ip")
-        db_name = request.args.get("db_name")
-        table_name = request.args.get("table_name")
-
-        if not row_id:
-            return {"success": False, "message": "Satır ID'si sağlanmadı"}, 400
-
-        # Silme komutunu oluştur
-        command = (
-            f"mysql -u root -p{SSH_PASSWORD} -D {db_name} -e "
-            f"\"DELETE FROM {table_name} WHERE id='{row_id}';\""
-        )
-
-        ssh = paramiko.SSHClient()
-        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        ssh.connect(hostname=ip, username=SSH_USER, password=SSH_PASSWORD)
-
-        # Silme komutunu çalıştır
-        ssh.exec_command(command)
-        ssh.close()
-
-        return {"success": True}, 200
-    except Exception as e:
-        return {"success": False, "message": str(e)}, 500
-
 @app.context_processor
 def utility_processor():
     return dict(zip=zip)
-
 
 if __name__ == "__main__":
     app.run(debug=True, port=8080)
