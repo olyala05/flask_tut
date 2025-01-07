@@ -18,15 +18,13 @@
         <div style="display: flex; gap: 10px;">
             <button type="submit" name="fetch_modems_data" value="true" class="btn btn-primary"><i class="fa-solid fa-wifi"></i> Modems</button>
             <button type="submit" name="fetch_equipment_data" class="btn btn-primary"><i class="fa-solid fa-screwdriver-wrench"></i> Equipments</button>
-            <button id="modbusButton" class="btn btn-primary"><i class="fa-brands fa-usb"></i> Modbus</button>
+            <button type="submit" name="fetch_modbus_data" class="btn btn-primary"><i class="fa-solid fa-cogs"></i> Modbus</button>
         </div>
 
         <button type="submit" name="restart_modem" class="btn btn-danger" onclick="return confirmRestart()">
             <i class="fa-solid fa-rotate-left"></i> Reboot Modem
         </button>
-        
     </div>
-    
 </form>
 
 {% if fetched_data %}
@@ -35,6 +33,8 @@
             Modems Information
         {% elif 'fetch_equipment_data' in request.form %}
             Equipments Information
+        {% elif 'fetch_modbus_data' in request.form %}
+            Modbus Information
         {% else %}
             Tablodan Gelen Veriler
         {% endif %}
@@ -86,56 +86,14 @@
             Ekipman tablosu boş
         {% elif 'fetch_modems_data' in request.form %}
             Modems tablosu boş
+        {% elif 'fetch_modbus_data' in request.form %}
+            Modbus Bağlı Değil
         {% else %}
             Tablo boş
         {% endif %}
     </h3>
 {% endif %}
 <br>
-
-<div id="modbusForm" style="display: none; margin-top: 20px;">
-    <form method="post">
-        <label for="selected_ip">Cihaz IP Seçin:</label>
-        <select id="selected_ip" name="selected_ip">
-            <option value="">Seçiniz...</option>
-            {% for device in devices %}
-                <option value="{{ device }}" {% if device == selected_ip %}selected{% endif %}>{{ device }}</option>
-            {% endfor %}
-        </select>
-    
-        <h3>Modbus Parametreleri:</h3>
-        <input type="text" name="device_port" placeholder="Port (örn: COM1)" required>
-        <input type="number" name="baudrate" placeholder="Baudrate (örn: 9600)" required>
-        <select name="parity">
-            <option value="N">None</option>
-            <option value="E">Even</option>
-            <option value="O">Odd</option>
-        </select>
-        <input type="number" name="stopbits" placeholder="Stopbits (örn: 1)" required>
-        <input type="number" name="start_address" placeholder="Başlangıç Adresi" required>
-        <input type="number" name="end_address" placeholder="Bitiş Adresi" required>
-        <input type="number" name="slave_id" placeholder="Slave ID" required>
-    
-        <button type="submit" name="action" value="modbus">Modbus Verilerini Getir</button>
-    </form>
-</div>
-
-
-{% if modbus_data %}
-    <h2>Modbus Verileri:</h2>
-    <table>
-        <tr>
-            <th>Adres</th>
-            <th>Değer</th>
-        </tr>
-        {% for address, value in modbus_data.items() %}
-            <tr>
-                <td>{{ address }}</td>
-                <td>{{ value }}</td>
-            </tr>
-        {% endfor %}
-    </table>
-{% endif %}
 
 <script type="text/javascript" src="{{ url_for('static', filename='js/app.js') }}"></script>  
 {% endblock content %} 
