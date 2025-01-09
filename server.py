@@ -12,6 +12,13 @@ SSH_HOST = os.getenv("SSH_HOST", "localhost")
 SSH_USER = os.getenv("SSH_USER", "root")
 SSH_PASSWORD = os.getenv("SSH_PASSWORD", "123")
 
+db_config = {
+    'host': 'localhost',     
+    'user': 'root',         
+    'password': '123',        
+    'database': 'iot'         
+}
+
 def ssh_connect(ip, username, password):
     """SSH ile IP'ye bağlanır ve doğrular."""
     try:
@@ -236,6 +243,138 @@ else:
             return {"is_empty": False, "data": [modbus_values]}
     except Exception as e:
         return {"is_empty": False, "data": [[f"Hata: {str(e)}"]]}
+
+def get_equipment_models(ip):
+    try:
+        # SSH bağlantısı başlatılıyor
+        ssh = paramiko.SSHClient()
+        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+
+        # SSH bağlantısını kuruyoruz
+        try:
+            ssh.connect(hostname=ip, username=SSH_USER, password=SSH_PASSWORD)
+            logging.debug("SSH bağlantısı başarılı.")
+        except Exception as e:
+            logging.error(f"SSH bağlantısı başarısız: {e}")
+            return {"is_empty": True, "data": [["SSH Bağlantısı başarısız."]]}
+
+        # MySQL komutunu çalıştırıyoruz
+        command = 'mysql -u root -p{} -D iot -e "SELECT * FROM equipment_models;"'.format(SSH_PASSWORD)
+        stdin, stdout, stderr = ssh.exec_command(command)
+
+        # Çıktıları alıyoruz
+        output = stdout.read().decode()
+        error_output = stderr.read().decode()
+
+        # Eğer hata varsa, log'la ve boş döndür
+        if error_output:
+            logging.error(f"MySQL Hatası: {error_output}")
+            return []
+
+        # Verinin satırlara ayrılmasını sağlıyoruz
+        lines = output.splitlines()
+        if not lines:
+            logging.error("MySQL'den herhangi bir veri alınamadı.")
+            return []
+
+        logging.debug(f"Veri satırları: {lines}")
+
+        # Başlıkları alıyoruz
+        headers = lines[0].split("\t")
+        rows = [dict(zip(headers, line.split("\t"))) for line in lines[1:]]
+
+        if not rows:
+            logging.error("Veri satırları işlenemedi.")
+            return []
+
+        logging.debug(f"İşlenen veri satırları: {rows}")
+
+        ssh.close()  # SSH bağlantısını kapatıyoruz
+
+        return rows
+
+    except Exception as e:
+        logging.error(f"SSH veya MySQL hatası: {str(e)}")
+        return {"is_empty": True, "data": [["SSH Bağlantısı başarısız."]]}
+
+def fetch_modbus_data(ip):
+    """Uzak cihazda Modbus RTU protokolü ile veri okuma işlemi."""
+    try:
+        logging.debug(f"{ip} adresine SSH bağlantısı başlatılıyor.")
+
+        # SSH bağlantısını başlat
+        ssh = paramiko.SSHClient()
+        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        ssh.connect(hostname=ip, username=SSH_USER, password=SSH_PASSWORD)
+        logging.debug(f"{ip} adresine SSH bağlantısı başarılı.")
+
+        # Uzak cihazda Modbus RTU bağlantısını başlat
+        logging.debug("Modbus RTU bağlantısı başlatılıyor.")
+        
+        stdin, stdout, stderr = ssh.exec_command(
+                    f"/usr/bin/python3 -c '"
+                    f"from pymodbus.client import ModbusSerialClient; "
+                    f"client = ModbusSerialClient(method=\"rtu\", port=\"/dev/ttyUSB0\", stop_bits=1, byte_size=8, baudrate=19200, parity=\"N\", timeout=1); "
+                    f"connected = client.connect(); "
+                    f"print(\"Connected:\" if connected else \"Connection Failed\"); "
+                    f"client.close();'"
+                )
+        
+        # Çıktıyı al ve bağlantıyı doğrula
+        output = stdout.read().decode().strip()
+        error_output = stderr.read().decode().strip()
+        if "Connection Failed" in output or error_output:
+            logging.error(f"Modbus RTU bağlantısı başarısız: {error_output or output}")
+            ssh.close()
+            return {"is_empty": True, "data": [["Modbus RTU bağlantısı başarısız."]]}
+
+        logging.debug("Modbus RTU bağlantısı başarılı.")
+        
+        # Modbus verilerini oku
+        equipment_models = get_equipment_models(ip)
+        if not equipment_models:
+            logging.error("Ekipman modelleri alınamadı.")
+            ssh.close()
+            return {"is_empty": True, "data": [["Ekipman modelleri alınamadı."]]}
+
+        fetched_data = []
+        for slave_id in range(1, 21):  # Slave ID'leri döngü ile kontrol et
+            for model in equipment_models:
+                logging.debug(f"Slave ID {slave_id} için register okuma başlatılıyor.")
+                stdin, stdout, stderr = ssh.exec_command(
+                    f"/usr/bin/python3 -c '"
+                    f"from pymodbus.client import ModbusSerialClient; "
+                    f"client = ModbusSerialClient(method=\"rtu\", port=\"/dev/ttyUSB0\", stop_bits=1, byte_size=8, baudrate=19200, parity=\"N\", timeout=1); "
+                    f"connected = client.connect(); "
+                    f"print(\"Connected:\" if connected else \"Connection Failed\"); "
+                    f"client.close();'"
+                )
+                output = stdout.read().decode().strip()
+                error_output = stderr.read().decode().strip()
+                if "Error" in output or error_output:
+                    logging.error(f"Slave ID {slave_id} için geçersiz yanıt: {error_output or output}")
+                    continue
+
+                # Register değerlerini işle
+                if output:
+                    fetched_data.append([ 
+                        f"Slave ID: {slave_id}",
+                        f"Model Name: {model['name']}",
+                        f"Register Value: {output}",
+                    ])
+
+        ssh.close()
+
+        if not fetched_data:
+            logging.error("Hiçbir cihaz eşleşmedi.")
+            return {"is_empty": True, "data": [["Hiçbir cihaz eşleşmedi."]]}
+
+        logging.debug("Veriler başarıyla alındı.")
+        return {"is_empty": False, "data": fetched_data}
+
+    except Exception as e:
+        logging.error(f"SSH veya Modbus RTU bağlantı hatası: {e}")
+        return {"is_empty": True, "data": [[f"Hata: {str(e)}"]]}
 
 
 @app.route("/", methods=["GET", "POST"])
